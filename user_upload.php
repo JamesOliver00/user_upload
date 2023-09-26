@@ -59,6 +59,16 @@ function main($args){
     $dry_run = false;
 
     //process args
+    if(!count($args)){
+        $message = "\r\n\r\n"; 
+        $message .= "No accepted options indetified";
+        $message.= "\r\n\r\n"; 
+        $message .= "Try... \r\n \"php user_upload.php --help\" \r\n to see available options";
+        $message.= "\r\n\r\n"; 
+
+        f_output(STDOUT, $message);
+    }
+
     foreach($args as $arg => $val){
         switch ($arg){
             case "u":
