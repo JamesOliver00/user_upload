@@ -17,7 +17,7 @@ $long_options =
 
 // sends output to file handle
 function f_output($output_stream, $s){
-    fwrite($output_stream, $s);
+    fwrite($output_stream, "\r\n\r\n".$s."\r\n\r\n");
     return 0;
 }
 
@@ -35,7 +35,7 @@ function help(){
     ];
     
     
-    $help = "\r\n[===== Help =====]\r\n\r\n";
+    $help = "[===== Help =====]\r\n\r\n";
     foreach($directives as $directive => $desc){
         $help .= "$directive - $desc\r\n";
     }
@@ -62,11 +62,9 @@ function main($args){
 
     //process args
     if(!count($args)){
-        $message = "\r\n\r\n"; 
-        $message .= "No accepted options indetified";
-        $message.= "\r\n\r\n"; 
+        $message = "Error : No accepted options indetified";
+        $message .= "\r\n\r\n"; 
         $message .= "Try... \r\n \"php user_upload.php --help\" \r\n to see available options";
-        $message.= "\r\n\r\n"; 
 
         f_output(STDOUT, $message);
         return;
@@ -120,15 +118,11 @@ function main($args){
     }
     catch(Exception $e){
         $err = $e -> getMessage()."\n";
-        $message = "\r\n\r\n"; 
-        $message .= "Error: Database connection fail\r\n";
+        $message = "Error: Database connection fail\r\n";
         $message .= "Message: $err";
-        $message .= "\r\n\r\n"; 
-
         f_output(STDOUT, $message);
         exit();
     }
-
     
     //create table
     if($create_table)
@@ -154,16 +148,45 @@ function main($args){
             }
         }
         catch (Exception $e){
-            $message = "\r\n\r\n"; 
-            $message .= "Error: Database not figured correctly\r\n";
+            $message = "Error: Database not figured correctly\r\n";
             $message .= "Try, --create_table to resolve database issues";
-            $message .= "\r\n\r\n"; 
             f_output(STDOUT, $message);
             exit();
         }
     }
 
+    
+    $filepath = __DIR__. '/' . $filename; 
     //process csv file
+    $fh = fopen($filepath, 'r' );
+    if($fh){
+        $firstRow = true;
+        while(($data = fgetcsv($fh)) !== FALSE){
+            if($firstRow){
+                $firstRow = false;
+                continue;
+            }
+
+            [$firstname, $lastname, $email] = $data;
+
+            $email = filter_var($email, FILTER_SANITIZE_EMAIL);
+            if(filter_var($email, FILTER_VALIDATE_EMAIL)){
+                $firstname = ucfirst(trim($firstname, "\n\r\t "));
+                $lastname = ucfirst(trim($lastname, "\n\r\t "));
+            }
+            else{
+                $message = "Error: $email is not a valid email format";
+                f_output(STDOUT, $message);
+            }
+        }
+    }
+    else
+    {
+        $message = "Error: File doesn't exist\r\n";
+        f_output(STDOUT, $message);
+        exit();
+    }
+    
 
     
 
