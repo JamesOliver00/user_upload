@@ -39,8 +39,6 @@ function help(){
     foreach($directives as $directive => $desc){
         $help .= "$directive - $desc\r\n";
     }
-    $help .= "\r\n\r\n";
-
     f_output(STDOUT, $help);
     exit();
 }
@@ -106,56 +104,60 @@ function main($args){
         }
         
     }
-
-    // connect to db
-    $dsn = "mysql:host=" . $host_ip;
-    if($host_port!=''){
-        $dsn .= ";port=" . $host_port;
-    }
-
-    try{
-        $pdo = new PDO($dsn, $username, $pass);
-    }
-    catch(Exception $e){
-        $err = $e -> getMessage()."\n";
-        $message = "Error: Database connection fail\r\n";
-        $message .= "Message: $err";
-        f_output(STDOUT, $message);
-        exit();
-    }
-    
-    //create table
-    if($create_table)
-    {
-       $createDBQ = "CREATE DATABASE IF NOT EXISTS $dbname";
-       $pdo->query($createDBQ);
-       $pdo->query("USE test");
-       $createTableQ = "CREATE TABLE IF NOT EXISTS $tablename (
-            name varchar(255),
-            surname varchar(255),
-            email varchar(255) UNIQUE
-        );";
-        $pdo->query($createTableQ);
-        exit();
-    }
-    else{
-        try{
-            $pdo->query("USE $dbname");
-            $queryRes = $pdo->query("SHOW TABLES FROM $dbname LIKE '$tablename'");
-            $rows = $queryRes->fetchAll();
-            if(!count($rows)){
-                throw new Exception("Error: Table $tablename doesn't exist");
-            }
+    //check dry run
+    if(!$dry_run){
+        // connect to dbE
+        $dsn = "mysql:host=" . $host_ip;
+        if($host_port!=''){
+            $dsn .= ";port=" . $host_port;
         }
-        catch (Exception $e){
-            $message = "Error: Database not figured correctly\r\n";
-            $message .= "Try, --create_table to resolve database issues";
+
+        try{
+            $pdo = new PDO($dsn, $username, $pass);
+        }
+        catch(Exception $e){
+            $err = $e -> getMessage()."\n";
+            $message = "Error: Database connection fail\r\n";
+            $message .= "Message: $err";
             f_output(STDOUT, $message);
             exit();
         }
+        
+        //create table
+        if($create_table)
+        {
+            $createDBQ = "CREATE DATABASE IF NOT EXISTS $dbname";
+            $pdo->query($createDBQ);
+            $pdo->query("USE test");
+            $createTableQ = "CREATE TABLE IF NOT EXISTS $tablename (
+                name varchar(255),
+                surname varchar(255),
+                email varchar(255) UNIQUE
+            );";
+            $pdo->query($createTableQ);
+            exit();
+        }
+        else{
+            try{
+                $pdo->query("USE $dbname");
+                $queryRes = $pdo->query("SHOW TABLES FROM $dbname LIKE '$tablename'");
+                $rows = $queryRes->fetchAll();
+                if(!count($rows)){
+                    throw new Exception("Error: Table $tablename doesn't exist");
+                }
+            }
+            catch (Exception $e){
+                $message = "Error: Database not figured correctly\r\n";
+                $message .= "Try, --create_table to resolve database issues";
+                f_output(STDOUT, $message);
+                exit();
+            }
+        }
     }
 
-    
+    //array of data to be inserted into db
+    $valid_data = [];
+
     $filepath = __DIR__. '/' . $filename; 
     //process csv file
     $fh = fopen($filepath, 'r' );
@@ -166,13 +168,17 @@ function main($args){
                 $firstRow = false;
                 continue;
             }
-
             [$firstname, $lastname, $email] = $data;
-
             $email = filter_var($email, FILTER_SANITIZE_EMAIL);
             if(filter_var($email, FILTER_VALIDATE_EMAIL)){
-                $firstname = ucfirst(trim($firstname, "\n\r\t "));
-                $lastname = ucfirst(trim($lastname, "\n\r\t "));
+                $email = strtolower($email);
+
+                $firstname = trim($firstname, "\n\r\t ");
+                $lastname = trim($lastname, "\n\r\t ");
+                $firstname = str_replace('\' ', '\'', ucwords(str_replace('\'', '\' ', strtolower($firstname))));
+                $lastname = str_replace('\' ', '\'', ucwords(str_replace('\'', '\' ', strtolower($lastname))));
+
+                $valid_data[]= [$firstname, $lastname, $email];
             }
             else{
                 $message = "Error: $email is not a valid email format";
@@ -187,12 +193,20 @@ function main($args){
         exit();
     }
     
-
-    
-
     //check dry run
     if(!$dry_run){
-        
+        //insert into db
+        foreach($valid_data as $i => $data){
+            [$firstname, $lastname, $email] = $data;
+            $ins = "INSERT INTO users (name, surname, email) VALUES (? , ? , ? )";
+            $insStmt = $pdo->prepare($ins);
+            try{
+                $insStmt -> execute([$firstname, $lastname, $email]);
+            }
+            catch(Exception $e){
+                f_output(STDOUT, "Error: " . $e->getMessage() . "... skipping this email ...");
+            }
+        }
     }
 }
 
