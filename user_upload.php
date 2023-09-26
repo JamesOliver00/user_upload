@@ -161,7 +161,7 @@ function main($args){
     $filepath = __DIR__. '/' . $filename; 
     //process csv file
     $fh = fopen($filepath, 'r' );
-    if($fh){
+    if($fh && is_file($filepath)){
         $firstRow = true;
         while(($data = fgetcsv($fh)) !== FALSE){
             if($firstRow){
@@ -188,7 +188,7 @@ function main($args){
     }
     else
     {
-        $message = "Error: File doesn't exist\r\n";
+        $message = "Error: cannot find file\r\n";
         f_output(STDOUT, $message);
         exit();
     }
